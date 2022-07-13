@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>
+		Test
+	</title>
+</head>
+<body>
+    <script src="jquery-3.3.1.min.js"></script>
+    <script>
+        function time(){
+            var date = new Date();
+            var hour = date.getHours();
+            var mmm = 'am';
+            if(hour > 12) {hour -= 12; mmm = 'pm';}
+            var min = date.getMinutes();
+            if(min < 10) min = '0' + min;
+            return hour + ':' + min + ' ' + mmm;
+        }
+        window.onload = function(){
+            var request = new XMLHttpRequest();
+            request.open('GET', '/data?q=getcolor');
+            request.setRequestHeader('Content-Type', 'text/plain');
+            request.onreadystatechange = function() {
+                if(request.readyState == 4 && request.responseText == 'success') {
+                    var hue = request.getResponseHeader('themeHue');
+                    $('#chat input').css('background-color',`hsl(${hue}, 100%, 90%)`);
+                    $('#chat textarea').css('background-color',`hsl(${hue}, 100%, 90%)`);
+                    $('#cards').css('background-color',`hsl(${hue}, 100%, 90%)`);
+                    $('#memberList').css('background-color',`hsl(${hue}, 100%, 90%)`);
+                    $('#chooseclass').css('background-color',`hsl(${hue}, 100%, 90%)`);
+                }
+            };
+            request.send();
+        }
+        var server = window.location.href.match(/\?l=.+$/g)[0].substring(3);
+        var oragin = window.location.origin.replace(/https?:?\/\//,'');
+        var dmn;
+        if(window.location.origin.match(/^https/g) !== null) dmn = 'wss://';
+        else dmn = 'ws://'
+        var ws = new WebSocket(dmn + oragin + '/ws', server);   //switch to ws when debugging
+        ws.onmessage = function (evt){EventTriggered(evt.data);};
+        ws.onclose = function() {window.location.replace(window.location.origin + '/lobby');};
+        var UserName = document.cookie.match(/username=([^\n ;]+);?/)[1];
+        var logged = [];
+        var log = false;
+        var cards;
+        var initialized = false;
+        var yourturn = false;
+        var CharecterRefs = {};
+        var NameRefs = {};
+        var stats; //this var will probably cause errors for spectators if stathandler is reintroduced 
+        //the good stuff
+        function EventTriggered(event){
+            console.log(event);
+            if(log && event.split(':')[0] !== 'sethtml') logged.push(event);
+            else{
+            var arr = event.split(':');
+            switch(arr[0]){
+                case 'msg':
+                arr[1] = decodeURIComponent(arr[1]);
+                $('#chat textarea').val($('#chat textarea').val() + '\n> ' /*`\n<${time()}> ` timestamp */ + decodeURIComponent(arr.slice(1, arr.length).join(':')));
+                $('#chat textarea').val($('#chat textarea').val().replace(/^\n*/, ''));
+                $('#chat textarea').scrollTop($('#chat textarea')[0].scrollHeight);
+                break;
+                case 'statupdate':
+                var s = JSON.parse(event.substring(12 + arr[1].length));
+                if(arr[1] == 'true') stats = s;
+                else{
+                    for(var i in s.users){
+                        for(var j in s.users[i]){
+                            stats.users[i][j] += s.users[i][j];
+                        }
+                    }
+                    for(var i in s.enemies){
+                        for(var j in s.enemies[i]){
+                            stats.enemies[i][j] += s.enemies[i][j];
+                        }
+                    }
+                }
+                var keys = ['health', 'shield', 'range', 'strength', 'intelligence', 'armour', 'wisdom', 'pierce', 'cunning', 'max health'];
+                for(var i in stats.users){
+                    var msg = '';
+                    for(var j in stats.users[i]){
+                        if(j > 0){
+                            msg += keys[j] + ': ' + stats.users[i][j] + '\n'
+                        }
+                    }
+                    $(`#player${CharecterRefs[i]}wrapper .playerstats`).html('<p>' + msg + '</p>');
+                    $(`#player${CharecterRefs[i]}wrapper .healthbars .currenthealths`).css('width', (100 * stats.users[i][0] / stats.users[i][9]) + '%');
+                    //display shield??
+                }
+                for(var i in stats.enemies){
+                    var msg = '';
+                    for(var j in stats.enemies[i]){
+                        if(j > 0){
+                            msg += keys[j] + ': ' + stats.enemies[i][j] + '\n'
+                        }
+                    }
+                    $(`#enemy${i} .enemystats`).html('<p>' + msg + '</p>');
+                    $(`#enemy${i} .healthbars .currenthealths`).css('width', (100 * stats.enemies[i][0] / stats.enemies[i][9]) + '%');
+                    //display shield??
+                }
+
+                break;
+                case 'adduser':
+                var profile = $('template#user').html();
+                if(UserName !== arr[1]) profile = profile.replace('<button', '<button disabled');
+                profile = profile.replace('usernamehere', arr[1]);
+                profile = profile.replace('userhere', encodeURIComponent(arr[1]));
+                $('#memberList').append(profile);
+                break;
+                case 'removeuser':
+                var user = $('#user' + arr[1]);
+                user.remove();
+                $(`#player${CharecterRefs[arr[1]]}wrapper`).hide();
+                break;
+                case 'changeuser':
+                var user = $('#user' + arr[1]);
+                switch(arr[2]){ //changeuser:jordan:ready:true
+                    case 'class':
+                    var prev = user.children('img').attr('alt');
+                    user.children('img').attr('src', `assets/icons/${arr[3]}Icon.png`);
+                    user.children('img').attr('alt', arr[3]);
+                    if(CharecterRefs[arr[1]] !== undefined){
+                        $(`#player${CharecterRefs[arr[1]]}wrapper`).css('visibility', 'hidden');
+                        $(`#player${CharecterRefs[arr[1]]}wrapper h3`).html('');
+                    }
+                    var p = 0;
+                    switch(arr[3]){
+                        case 'rogue': p = 1; break;
+                        case 'mage': p = 3; break;
+                        case 'cleric': p = 5; break;
+                        case 'warrior': p = 7; break;
+                        case 'random': p = 8; break;
+                    }
+                    if(p < 8){
+                        if($(`#player${p}wrapper`).css('visibility') == 'visible'){
+                            $(`#player${p+1}wrapper`).css('visibility', 'visible');
+                            $(`#player${p+1}wrapper h3`).html(arr[1]);
+                            CharecterRefs[arr[1]] = p+1;
+                            NameRefs[p] = arr[1];
+                        } 
+                        else{
+                            $(`#player${p}wrapper`).css('visibility', 'visible');
+                            $(`#player${p}wrapper h3`).html(arr[1]);
+                            CharecterRefs[arr[1]] = p;
+                            NameRefs[p] = arr[1];
+                        }
+                    }
+                    else if(p == 8){
+                        CharecterRefs[arr[1]] = undefined;
+                    }
+                    break;
+                    case 'ready':
+                    user.children('button').css('background-color', (arr[3] == 'true' ? '#0f0' : '#f00'));
+                    user.children('button').text((arr[3] == 'true' ? 'Ready' : 'Not Ready'))
+                    break;
+                }
+                break;
+                case 'enable':
+                $('#' + arr[1]).show();
+                break;
+                case 'disable':
+                $('#' + arr[1]).hide();
+                break;
+                case 'initialize':
+                $('#chooseclasswrapper').remove();
+                $('#readycountdown').hide();
+                $('#combowrapper').css('visibility', 'visible');
+                var prof = $('.userProfile button');
+                if(typeof prof !== 'array') prof = [prof];
+                for(var i in prof) prof[i].remove();
+                initialized = true;
+                //more stuff?
+                break;
+                case 'loss':
+                $('#readycountdown').html('💀');//☠🕱
+                $('#readycountdown').show();
+                break;
+                case 'highlight':
+                if(arr[1] == 'null'){
+                    var arr2 = $('.card');
+                    if(typeof arr2 !== 'array') arr2 = [arr2];
+                    for(var i in arr2) arr2[i].css('filter', 'brightness(100%)');
+                    
+                }
+                else{
+                    var arr2 = document.querySelectorAll('.card');
+                    for(var i in arr2){
+                        try{
+                            if(cards[arr2[i].getAttribute('arrayindex')].name == arr[1]) $(arr2[i]).css('filter', 'brightness(100%)');
+                            else $(arr2[i]).css('filter', 'brightness(75%)');
+                        }catch(err){}
+                    }
+                }
+                break;
+                case 'removeenemy':
+                var arr2 = document.querySelectorAll('.enemy');
+                for(var i in arr2){
+                    if(arr2[i].getAttribute('arrayindex') == arr[1]) {
+                        $(arr2[i]).remove();
+                        break;
+                    }
+                }
+                break;
+                case 'setturn':
+                $('#cardinput').html('');
+                selected = null;
+                $('#status1').html('');
+                $('#status2').html('');
+                yourturn = arr[1] == UserName;
+                var arr2 = document.querySelectorAll('.userProfile');
+                for(var i in arr2){
+                    try{
+                    if(arr2[i].getAttribute('id') == 'user' + arr[1]) $(arr2[i]).css('background-color', '#ff0');
+                    else $(arr2[i]).css('background-color', '#ccc');
+                    }catch(err){}
+                }
+                break;
+                case 'carddisplay':
+                cards = JSON.parse(event.substring(12));
+                for(var i in cards){
+                    var card = $('#card').html();
+                    card = card.replace('someindex', i);
+                    card = card.replace('assets/icons/randomIcon.png', 'assets/cards/' + cards[i].name + '.png');
+                    card = card.replace('???', cards[i].name);
+                    card = card.replace('carddeschere', cards[i].description);
+                    card = card.replace('cardnamehere', cards[i].name);
+                    card = card.replace('IDHERE', cards[i].name);
+                    $('#cardinput').append(card);
+                }
+                break;
+                case 'enemydisplay':
+                var enemies = JSON.parse(event.substring(13));
+                for(var i in enemies){
+                    var enemy = $('#enemy').html();
+                    enemy = enemy.replace('someindex', i);
+                    enemy = enemy.replace('assets/icons/randomIcon.png', 'assets/enemies/' + enemies[i].name + '.png');
+                    enemy = enemy.replace('enemynamehere', enemies[i].name);
+                    enemy = enemy.replace('enemyenemyhere', 'enemy' + i);
+                    $('#enemieswrapper').append(enemy);
+                }
+                break;
+                case 'combodisplay':
+                var s = 100 * (1 - Math.pow((2/3), parseInt(arr[2])));
+                switch(arr[1]){
+                    case'w': $('#combowrapper').css('background-color', 'hsl(0, 0%, 50%)'); break;
+                    case'r': $('#combowrapper').css('background-color', `hsl(0, ${s}%, 50%)`); break;
+                    case'g': $('#combowrapper').css('background-color', `hsl(120, ${s}%, 50%)`); break;
+                    case'b': $('#combowrapper').css('background-color', `hsl(240, ${s}%, 50%)`); break;
+                    case'y': $('#combowrapper').css('background-color', `hsl(60, ${s}%, 50%)`); break;
+                }
+                $('#comboNumber').html(`<p>${arr[2]}</p>`);
+                $('#comboPool').html(`<p>${arr[3]}</p>`);
+                break;
+                case 'logdata':
+                log = true;
+                break;
+                case 'gethtml':
+                ws.send('html:' + $('#globalwrapper').html());
+                break;
+                case 'sethtml':
+                $('#globalwrapper').html(event.substring(8));
+                log = false;
+                for(var i in logged){
+                    EventTriggered(logged[i]);
+                }
+                break;
+                case 'readytimertoggle':
+                if(arr[1] == 'true') {
+                    $('#readycountdown').show();
+                    $('#chooseclasswrapper').hide();
+                    $('#readycountdown').text('5');
+                    readytimer = setInterval(()=>{
+                        var next = parseInt($('#readycountdown').html()) - 1;
+                         if(next > -1) $('#readycountdown').text(next);
+                    }, 1000);
+                }
+                else {
+                    $('#readycountdown').hide();
+                    $('#chooseclasswrapper').show();
+                    clearInterval(readytimer);
+                }
+                break;
+            }}
+        }
+        var readytimer;
+        var selected;
+        var targets;
+
+        function sendMSG(event){
+            if (event.keyCode == 13) {
+                ws.send('msg:' + $('#chat input').val());
+                $('#chat input').val('');
+            }
+        }
+
+        function chooseCard(elem){
+            if (selected !== cards[parseInt(elem.getAttribute('arrayindex'))] && yourturn){
+                selected = cards[parseInt(elem.getAttribute('arrayindex'))];
+                ws.send('highlight:' + selected.name);
+                targets = [];
+                if(selected.targeting.length > 0) $('#status1').html('Select ' + selected.targeting[targets.length]);
+                else $('#status1').html('Ready');
+                $('#status2').html(selected.name);
+            }
+            else{ 
+                ws.send('highlight:null');
+                selected = null;
+                $('#status1').html('');
+                $('#status2').html('');
+            }
+        }
+        var prev;
+
+        function cardDescription(element){
+            //if(evt.button == 2){
+            var elem = $(element).children('p');
+            if(elem.css('visibility') == 'hidden') elem.css('visibility', 'visible');
+            else elem.css('visibility', 'hidden');
+            if(prev !== undefined && prev.attr('id') !== elem.attr('id')) prev.css('visibility', 'hidden');
+            prev = elem;
+            return false;
+            //}
+        }
+
+        function chooseEnemy(elem){
+            if(selected && selected.targeting.length > targets.length && (selected.targeting[targets.length] == 'enemy' || selected.targeting[targets.length] == 'any') && yourturn){
+                targets.push(elem.getAttribute('arrayindex'));
+                if(selected.targeting.length > targets.length) $('#status1').html('select ' + selected.targeting[targets.length] + 'to continue');
+                else $('#status1').html('Ready');
+            }
+        }
+
+        function choosePlayer(elem){
+            if(selected && selected.targeting.length > targets.length && selected.targeting[targets.length] !== 'enemy' && !(selected.targeting[targets.length] == 'ally' && elem.parentElement.getAttribute('id').includes('user' + username)) && yourturn){
+                targets.push(elem.parentElement.getAttribute('id').substring(4));
+                if(selected.targeting.length > targets.length) $('#status1').html('select ' + selected.targeting[targets.length] + 'to continue');
+                else $('#status1').html('Ready');
+            }
+        }
+
+        function choosePlayer2(elem){
+            if(selected && selected.targeting.length > targets.length && selected.targeting[targets.length] !== 'enemy' && !(selected.targeting[targets.length] == 'ally' && NameRefs[elem.getAttribute('id').match(/player(\d)wrapper/)[1]] == UserName) && yourturn){
+                targets.push(NameRefs[elem.getAttribute('id').match(/player(\d)wrapper/)[1]]);
+                if(selected.targeting.length > targets.length) $('#status1').html('select ' + selected.targeting[targets.length] + 'to continue');
+                else $('#status1').html('Ready');
+            }
+        }
+
+        function confirmCard(){
+            if(initialized && selected.targeting.length == targets.length && yourturn){
+                ws.send('selectcard:' + selected.name + ':' + targets.join(','));
+            }
+        }
+
+        function chooseclass(element){
+            ws.send('setclass:' + element.alt);
+            //$('#chooseclasswrapper').hide();
+        }
+
+        function ChangeReadyState(element){
+            ws.send('toggleready');
+        }
+        setInterval(function(){ws.send('dispose')}, 50000);
+        $('readycountdown').hide();
+    </script>
+    <style>
+        body {padding: 0px; margin: 0px; width: 100vw; height: 100vh;}
+        #globalwrapper {padding: 0px; margin: 0px; width: 100%; height: 100%;}
+        #memberpanel {min-width: 300px;box-sizing: border-box; width: 20%; height: 70%; margin: 0px; background-color: #ccc; padding: 5px; padding-bottom: 0px; display: block; float: left;}
+        #chatpanel {min-height: 250px;min-width: 300px;box-sizing: border-box; width: 20%; height: 30%; margin: 0px; background-color: #ccc; padding: 5px; display: block; float: left;}
+        #cardpanel {min-height: 250px;box-sizing: border-box; width: 80%; height: 30%; margin: 0px; background-color: #ccc; padding: 5px; padding-left: 0px; display: block; float: right;}
+        .wrappercontent {box-sizing: border-box; height: 100%; width: 100%; margin: 0px;}
+        #gamewrapper{box-sizing: border-box; width: 80%; height: 70%; margin: 0px; background-color: white; display: block; float: right; position: relative; padding: 5px;}
+        @media screen and (max-width: 1500px) {#gamewrapper{width: calc(100% - 300px);}}
+        @media screen and (max-width: 1500px) {#cardpanel{width: calc(100% - 300px);}}
+        @media screen and (max-height: 833px) {#gamewrapper{height: calc(100% - 250px);}}
+        @media screen and (max-height: 833px) {#memberpanel{height: calc(100% - 250px);}}
+        #chat{background-color: #ccc;}
+        #chat input{box-sizing: border-box; width: 100%; height: 20px; border: 1px black solid; border-radius: 3px; margin: 0px; font-family: monospace; background-color: #cde6ff;}
+        #chat textarea{margin-bottom: 5px; resize: none; box-sizing: border-box; height: calc(100% - 25px); width: 100%; border: 1px black solid; border-radius: 3px; vertical-align: top; background-color: #cde6ff;}
+
+        #cards{border: 1px black solid; border-radius: 3px;  background-color: #cde6ff;}
+        .card { width: 150px; height: 210px; margin: 13px; float: left; border: 1px gray solid; border-radius: 5px;}
+        .card img { border-radius: 4px;}
+        .card p { /*word-break: break-all;*/font-size: 10pt;position: absolute; margin: 10px; width: 130px; height: 160px; margin-top: 40px; visibility: hidden;}
+        .card label {position: absolute; margin: 10px; width: 130px; height: 20px; margin-top: 8px; text-align: center;}
+        
+        .enemy { /*width: 150px; height: 210px;*/ margin: 3px; float: left; /* border: 1px gray solid; border-radius: 3px; */ padding: 2px;}
+        .statuscontent{display: block;box-sizing: border-box; overflow: auto; width: 100%; height: 100%; padding: 2px; margin: 2px; border: 1px black solid; background-color: white;}
+        button.statuscontent{background-color: #ddd}
+        .statuscontent p{text-align: center; margin: 0px;}
+        #statuspanel {float: right; height: 25px; width: 225px; box-sizing: border-box; margin-right: 6px; margin-top: 2px;}
+        #memberwrapper {box-sizing: border-box; width: 100%; height: 100%; margin: 0px; border-radius: 3px;}
+        #memberList {box-sizing: border-box; overflow: auto; width: 100%; height: 100%; padding: 2px; margin: 0px; border: 1px black solid; border-radius: 3px; background-color: #cde6ff;}
+        #chooseclasswrapper {height: calc(100% - 2px); width: 500; margin: 0px; overflow: auto; border-radius: 3px; }
+        #chooseclass {box-sizing: border-box; height: 100%; width: 100%; margin: 0px; background-color: #cde6ff; padding: 2px;}
+        #chooseclass h2 {width: 120px; text-align: center; margin: auto; margin-top: 5px; margin-bottom: 5px; float: left; font-family: monospace;}
+        .classimg { width: 60px; height: 60px; margin: 2px; border-style: outset; border: 2px;}
+        #readycountdown{ margin: 0px; font-family: monospace; position: absolute; top: 50%; left: 50%; margin-right: -50%; transform: translate(-50%, -50%); overflow: visible; font-size: 300px;}
+        .userProfile { box-sizing: border-box; width: calc(100% - 2px); overflow: auto; margin: 1px; border: 1px black solid;  background-color: white; float: left; position: relative;}
+        .userProfile img{ width: 60px; height: 60px; display: block; float: left; position: relative;}
+        .userProfile h3{ margin-left: 10px; margin-top: 8px; margin-bottom: 8px; text-align: left; font-family: monospace; height: 100%; width: calc(100% - 140px); float: left; position: relative;}
+        .userProfile button{border: 0px; color:black; box-sizing: border-box; width: 60px; float: right; height: 60px; font-size: 16px; font-family: monospace; font-weight: bolder; display: block;}
+        .userProfile button:focus {outline:0;}
+
+        #playerswrapper { box-sizing: border-box; float: left; width: 500px; height: 500px; margin: 0px; padding: 0px;}
+        .columns { box-sizing: border-box; float: left; width: 100px; height: 500px; margin: 0px; margin-left: 25px; padding: 0px;}
+        .players { visibility: hidden;box-sizing: border-box; width: 100px; height:200px; margin: 0px; padding: 0px; visibility: hidden;}
+        .playerstats { box-sizing: border-box; position: absolute; width: 100px; height: 200px; margin: 0px; padding: 0px;}
+        /*.playerstats:hover{visibility: visible}*/
+        .playerstats p{opacity: 0; background-color: white; text-align: center;}
+        .playerstats p:hover{opacity: 1;}
+        .playernames { box-sizing: border-box; font-family: monospace; text-align: center; width: 100px; height: 20px; margin: 0px; padding: 0px; position: absolute;}
+        .playersprites { display: block; margin: auto; margin-top: 0px; margin-bottom: 10px; box-sizing: border-box; /*vertical-align: bottom;*/ width: 60px; height: 120px; padding: 0px;}
+        .healthbars { margin: auto;box-sizing: border-box; width: 100px; height: 20px; padding: 0px; border-radius: 10px; border: 1px black solid;}
+        .currenthealths { box-sizing: border-box; height: 100%; margin: 0px; padding: 0px; border-radius: 10px; background-color: #0f0}
+        .playerbuffs { box-sizing: border-box; width: 100px; height: 40px; margin: 0px; padding: 0px;}
+        .spacing {box-sizing: border-box; width: 100px; height: 100px; margin: 0px; padding: 0px;}
+
+        #enemieswrapper {box-sizing: border-box; float: right; width: 500px; height: 500px; margin: 0px; padding: 0px;}
+        .enemies {box-sizing: border-box; /*width: 200px; height:200px;*/width: 100%; margin: 0px; padding: 0px;}
+        .enemystats { box-sizing: border-box; position: absolute; width: 130px; height: 140px; margin: 0px; padding: 0px;}
+        /*.enemystats:hover{visibility: visible}*/
+        .enemystats p{opacity: 0; background-color: white; text-align: center;}
+        .enemystats p:hover{opacity: 1;}
+        .enemynames { display: block;margin: auto;box-sizing: border-box; font-family: monospace; text-align: center; /*width: 100px; height: 20px*/; padding: 0px;}
+        .enemysprites { display: block; margin: auto; box-sizing: border-box; /*vertical-align: bottom; width: 60px; height: 120px;*/ padding: 0px;}
+        .enemybuffs { margin: auto;box-sizing: border-box; width: 100px; height: 20px; padding: 0px;}
+
+        #combowrapper{display: inline-block; background-color: #ddd; visibility: hidden; overflow: auto; border: 1px black solid;}
+        /*.combocounter{box-sizing: border-box;width: 50px; height: 50px; margin: 5px; background-color: white; float:left; border: 1px black solid; padding: 2px;}*/
+        .combocounter {float:left;}
+        .combocounter p{font-size: 36px; text-align: center;box-sizing: border-box; margin: 5px; background-color: white; float:left; border: 1px black solid; padding: 2px; padding-left: 4px; padding-right: 4px;}
+    </style>
+    <template id="user">
+        <div class="userProfile" id="useruserhere" >
+            <img src="assets/icons/randomIcon.png" alt="???" onclick="choosePlayer(this)">
+            <h3 style="overflow:hidden;">usernamehere</h3>
+            <button style="background-color:#f00;" onclick="ChangeReadyState(this)">Not Ready</button>
+        </div>
+    </template>
+    <template id="card">
+        <div class="card" arrayindex="someindex" onclick="chooseCard(this)" oncontextmenu="return cardDescription(this)">
+            <label id="cardname">cardnamehere</label>
+            <p id ="cardIDHERE">carddeschere</p>
+            <img src="assets/icons/randomIcon.png" alt="???" >
+        </div>
+    </template>
+    <template id="enemy">
+        <div class="enemy" arrayindex="someindex" onclick="chooseEnemy(this)" id="enemyenemyhere">
+            <div id="enemywrapper" class="enemies">
+                <div id="enemystats" class="enemystats">
+                    
+                </div>
+                <div><h3 id="enemyname" class="enemynames">enemynamehere</h3></div>
+                <img id="enemyimg" class="enemysprites" src="assets/icons/randomIcon.png">
+                <div id="enemyhealthbar" class="healthbars">
+                    <div id="enemycurrenthealth" class="currenthealths"></div>
+                </div>
+                <div id="enemybuffs" class="enemybuffs">
+
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <div id="globalwrapper">
+        <div id="gamewrapper">
+            <h1 id="readycountdown"></h1>
+            <div style="width:100%; display:block;overflow-y: auto;">
+                <div id="enemieswrapper">
+
+                </div>
+                <div id="playerswrapper">
+                    <div id="column1" class="columns">
+                        <div id="player1wrapper" class="players" onclick="choosePlayer2(this)">
+                            <div id="player1stats" class="playerstats">
+
+                            </div>
+                            <h3 id="player1name" class="playernames"></h3>
+                            <img id="player1img" class="playersprites" src="assets/players/rogue.png">
+                            <div id="player1healthbar" class="healthbars">
+                                <div id="player1currenthealth" class="currenthealths"></div>
+                            </div>
+                            <div id="player1buffs" class="playerbuffs">
+
+                            </div>
+                        </div>
+                        <div id="player2wrapper" class="players"onclick="choosePlayer2(this)">
+                            <div id="player2stats" class="playerstats">
+
+                            </div>
+                            <h3 id="player2name" class="playernames"></h3>
+                            <img id="player2img" class="playersprites" src="assets/players/rogueAlt.png">
+                            <div id="player2healthbar" class="healthbars">
+                                <div id="player2currenthealth" class="currenthealths"></div>
+                            </div>
+                            <div id="player2buffs" class="playerbuffs">
+
+                            </div>
+                        </div>
+                    </div>
+                    <div id="column2" class="columns">
+                        <div id="column2spacing" class= "spacing"></div>
+                        <div id="player3wrapper" class="players"onclick="choosePlayer2(this)">
+                            <div id="player3stats" class="playerstats">
+
+                            </div>
+                            <h3 id="player3name" class="playernames"></h3>
+                            <img id="player3img" class="playersprites" src="assets/players/mage.png">
+                            <div id="player3healthbar" class="healthbars">
+                                <div id="player3currenthealth" class="currenthealths"></div>
+                            </div>
+                            <div id="player3buffs" class="playerbuffs">
+
+                            </div>
+                        </div>
+                        <div id="player4wrapper" class="players"onclick="choosePlayer2(this)">
+                            <div id="player4stats" class="playerstats"
+                            ></div>
+                            <h3 id="player4name" class="playernames"></h3>
+                            <img id="player4img" class="playersprites" src="assets/players/mageAlt.png">
+                            <div id="player4healthbar" class="healthbars">
+                                <div id="player4currenthealth" class="currenthealths"></div>
+                            </div>
+                            <div id="player4buffs" class="playerbuffs">
+
+                            </div>
+                        </div>
+                    </div>
+                    <div id="column3" class="columns">
+                        <div id="player5wrapper" class="players"onclick="choosePlayer2(this)">
+                            <div id="player5stats" class="playerstats"></div>
+                            <h3 id="player5name" class="playernames"></h3>
+                            <img id="player5img" class="playersprites" src="assets/players/cleric.png">
+                            <div id="player5healthbar" class="healthbars">
+                                <div id="player5currenthealth" class="currenthealths"></div>
+                            </div>
+                            <div id="player5buffs" class="playerbuffs">
+
+                            </div>
+                        </div>
+                        <div id="player6wrapper" class="players"onclick="choosePlayer2(this)">
+                            <div id="player6stats" class="playerstats">
+
+                            </div>
+                            <h3 id="player6name" class="playernames"></h3>
+                            <img id="player6img" class="playersprites" src="assets/players/clericAlt.png">
+                            <div id="player6healthbar" class="healthbars">
+                                <div id="player6currenthealth" class="currenthealths"></div>
+                            </div>
+                            <div id="player6buffs" class="playerbuffs">
+
+                            </div>
+                        </div>
+                    </div>
+                    <div id="column4" class="columns">
+                        <div id="column4spacing" class="spacing"></div>
+                        <div id="player7wrapper" class="players"onclick="choosePlayer2(this)">
+                            <div id="player7stats" class="playerstats">
+
+                            </div>
+                            <h3 id="player7name" class="playernames"></h3>
+                            <img id="player7img" class="playersprites" src="assets/players/warrior.png">
+                            <div id="player7healthbar" class="healthbars">
+                                <div id="player7currenthealth" class="currenthealths"></div>
+                            </div>
+                            <div id="player7buffs" class="playerbuffs">
+
+                            </div>
+                        </div>
+                        <div id="player8wrapper" class="players"onclick="choosePlayer2(this)">
+                            <div id="player8stats" class="playerstats">
+
+                            </div>
+                            <h3 id="player8name" class="playernames"></h3>
+                            <img id="player8img" class="playersprites" src="assets/players/warriorAlt.png">
+                            <div id="player8healthbar" class="healthbars">
+                                <div id="player8currenthealth" class="currenthealths"></div>
+                            </div>
+                            <div id="player8buffs" class="playerbuffs">
+
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+        <div id="memberpanel" style="float:left;">
+            <div class="wrappercontent" id="memberwrapper">
+                <div id="memberList">
+
+                </div>
+            </div>
+        </div>
+        <div id="chatpanel" style="float: left;">
+            <div class="wrappercontent" id="chat">
+                <textarea wrap="soft" readonly="true"></textarea></textarea>
+                <input wrap="soft" type="text" onkeypress="sendMSG(event)" maxlength="200">
+            </div>
+        </div>
+        <div id="cardpanel" style="float: right;">
+            <div class="wrappercontent" id="cards">
+                <div id="cardinput">
+                    
+                </div>
+                <div id="statuspanel">
+                    <div class="wrappercontent">
+                        <div class="statuscontent" style="border-radius: 3px;">
+                            <p id="status1"></p>
+                        </div>
+                        <div class="statuscontent" style="border-radius: 3px;">
+                            <p id="status2"></p>
+                        </div>
+                        <button class="statuscontent" onclick="confirmCard()" style="border-radius: 3px;">
+                            Confirm
+                        </button>
+                        <div id="combowrapper">
+                            <div class="combocounter" id="comboNumber"></div>
+                            <div class="combocounter" id="comboPool"></div>
+                        </div>
+                        <!--<p>//this info should be visualy illustrated instead of simply displaying it here</p>-->
+                    </div>
+                </div>
+                <div id="chooseclasswrapper">
+                    <div id="chooseclass">
+                        <h2>
+                             Choose Your Class
+                        </h2>
+                        <div style="display:block;">
+                        <img src="assets/icons/rogueIcon.png" alt="rogue" id="rogue" class="classimg" onclick="chooseclass(this)" style="border: 1px black solid">
+                        <img src="assets/icons/mageIcon.png" alt="mage" id="mage" class="classimg" onclick="chooseclass(this)" style="border: 1px black solid">
+                        <img src="assets/icons/clericIcon.png" alt="cleric" id="cleric" class="classimg" onclick="chooseclass(this)" style="border: 1px black solid">
+                        <img src="assets/icons/warriorIcon.png" alt="warrior" id="warrior" class="classimg" onclick="chooseclass(this)" style="border: 1px black solid">
+                        <img src="assets/icons/randomIcon.png" alt="random" id="random" class="classimg" onclick="chooseclass(this)" style="border: 1px black solid">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

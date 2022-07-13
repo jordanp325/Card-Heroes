@@ -1,0 +1,68 @@
+{
+    "floor1":[
+        {
+            "easy":[
+                {
+                    "name":"",
+                    "effect":"",
+                    "stats":[]
+                }
+            ],
+            "medium":[
+
+            ],
+            "hard":[
+
+            ],
+            "insane":[
+
+            ]
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        ,
+        {
+            "easy":[
+                {
+                    "name":"",
+                    "effect":"",
+                    "stats":[]
+                }
+            ],
+            "medium":[
+
+            ],
+            "hard":[
+
+            ],
+            "insane":[
+
+            ]
+        }
+    ],
+    "floor2":[],
+    "floor3":[]
+}

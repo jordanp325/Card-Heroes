@@ -1,0 +1,26 @@
+{
+	"command": "SELECT",
+	"rowCount": 1,
+	"oid": null,
+	"rows": [
+		{
+			"themehue": 241
+		}
+	],
+	"fields": [
+		{
+			"name": "themehue",
+			"tableID": 16395,
+			"columnID": 7,
+			"dataTypeID": 21,
+			"dataTypeSize": 2,
+			"dataTypeModifier": -1,
+			"format": "text"
+		}
+	],
+	"_parsers": [
+		null
+	],
+	"RowCtor": null,
+	"rowAsArray": false
+}

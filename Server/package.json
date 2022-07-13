@@ -1,0 +1,17 @@
+{
+  "name": "testapp325",
+  "version": "1.0.0",
+  "main": "wrapper.js",
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "body-parser": "^1.18.3",
+    "ejs": "^2.6.1",
+    "express": "^4.16.3",
+    "express-ws": "^4.0.0",
+    "json-stringify-safe": "^5.0.1",
+    "pg": "^7.4.3",
+    "request-ip": "^2.1.1"
+  }
+}

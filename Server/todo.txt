@@ -1,0 +1,16 @@
+
+    needs logan:
+add specific cards for skill tree
+implement modifiers after beating game
+hash out how to randomly generate enemies after lvl 30
+add specific enemy modifiers
+discuss more enemy encounters
+
+    misc:
+add specific encounters (in dms)
+implement skill tree 
+implement revival after ending encounter
+add support for enemy effects activating on duration type
+
+    logan:
+    

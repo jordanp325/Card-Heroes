@@ -1,0 +1,138 @@
+{
+    "Slice" :{
+        "color":"r",
+        "rarity":"0",
+        "targeting":["enemy"],
+        "effect":"self.attack(t1, 10)",
+        "description":"Deal 10 physical damage to target enemy"
+    },
+    "Double Strike" :{
+        "color":"r",
+        "rarity":"0",
+        "targeting":["enemy"],
+        "effect":"self.attack([t1, t1], 5)",
+        "description":"Deal 5 physical damage to target enemy twice"
+    },
+    "Block" :{
+        "color":"y",
+        "rarity":"0",
+        "targeting":[],
+        "effect":"self.addbuff(-1, [0, 10], -1)",
+        "description":"Gain 10 shield"
+    },
+    "Heal" :{
+        "color":"y",
+        "rarity":"0",
+        "targeting":[],
+        "effect":"self.addbuff(-1, [5], -1)",
+        "description":"Heal 5 health"
+    },
+    "Magic Blast" :{
+        "color":"b",
+        "rarity":"0",
+        "targeting":["enemy"],
+        "effect":"self.attack(t1, 0, 10)",
+        "description":"Deal 10 magic damage to target enemy"
+    },
+    "Explosion" :{
+        "color":"b",
+        "rarity":"0",
+        "targeting":[],
+        "effect":"var arr = []; for(var i in system.enemies) arr.push(system.enemies[i].self); self.attack(arr, 0, 5)",
+        "description":"Deal 5 damage to all enemies"
+    },
+    "Planning" :{
+        "color":"g",
+        "rarity":"0",
+        "targeting":[],
+        "effect":"self.addbuff(0000, [], 3, 0, ['self.draw(1)'])",
+        "description":"For the next 3 turns, draw an additional card each turn"
+    },
+    "Mark" :{
+        "color":"g",
+        "rarity":"0",
+        "targeting":["enemy"],
+        "effect":"self.attack(t1, 10); t1.addbuff(0001, [], 3, 5, ['', '', 'input[0]+=10;self.buffs[index].duration = 0; return input'])",
+        "description":"Deal 10 physical damage to target enemy and mark them for 2 turns. if an ally attacks a marked enemy their attack deals 10 bonus physical damage"
+    },
+
+
+    "Bash" :{
+        "color":"r",
+        "rarity":"0",
+        "targeting":["enemy"],
+        "effect":"self.attack(t1, 10);t1.addbuff(-1, [0, 0, 0, 0, 0, -5], 4, 5)",
+        "description":"Deal 10 physical damage to terget enemy, and reduce their armor by 5 for the next 3 turns"
+    },
+    "Iron Blow" :{
+        "color":"r",
+        "rarity":"0",
+        "targeting":["enemy"],
+        "effect":"self.attack(t1, 10);self.addbuff(-1, [0, 10], -1)",
+        "description":"Deal 10 physical damage to target enemy and gain 10 shield"
+    },
+    "Curse" :{
+        "color":"b",
+        "rarity":"0",
+        "targeting":["enemy"],
+        "effect":"t1.addbuff(-1, [0, 0, 0, 0, 0, -5, -5], 4, 5)",
+        "description":"Reduce target enemy's armor and wisdom by 5 for the next 3 turns"
+    },
+    "Fireball" :{
+        "color":"b",
+        "rarity":"0",
+        "targeting":["enemy"],
+        "effect":"self.attack(t1, 0, 10);t1.addbuff(2000, [], 3, 4, ['', '', '', '', 'self.addstat(0, -3)'])",
+        "description":"Deal 10 magic damage to target enemy and set them on fire for 3 rounds, dealing 3 damage per round"
+    },
+    "Preperation" :{
+        "color":"g",
+        "rarity":"0",
+        "targeting":[],
+        "effect":"self.addbuff(0002, [], 2, 1, ['', '', 'if(input[4] > 0 && input[0] > 0){input[0] += 10;input[4] += 10;}else if(input[0] > 0) input[0] += 20;else if(input[4] > 0) input[4] += 20;return input;'])",
+        "description":"Next turn, your attack will deal 20 bonus damage"
+    },
+    "Sneak Attack" :{
+        "color":"g",
+        "rarity":"0",
+        "targeting":["enemy"],
+        "effect":"self.addbuff(-1, [0, 0, 10], 1, 4);self.attack(t1, 10)",
+        "description":"Deal 10 damage to target enemy and gain 10 range"
+    },
+    "Blessing" :{
+        "color":"y",
+        "rarity":"0",
+        "targeting":["player"],
+        "effect":"t1.addbuff(-1, [10], -1);t1.addbuff(-1, [0, 0, 0, 5, 5], 1, 4)",
+        "description":"Heal 10 health to target player and grant them 5 strength and intelligence for 1 turn"
+    },
+    "Courage" :{
+        "color":"y",
+        "rarity":"0",
+        "targeting":["player"],
+        "effect":"t1.addbuff(-1, [0, 10], -1);t1.addbuff(-1, [0, 0, 0, 0, 0, 5, 5], 1, 4)",
+        "description":"Grant 10 shield to target player and grant them 5 armor and wisdon for 1 turn"
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    ,
+    "template" :{
+        "color":"",
+        "rarity":"",
+        "targeting":[],
+        "effect":"",
+        "description":""
+    }
+}

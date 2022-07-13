@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>
+		Test
+	</title>
+</head>
+<body>
+    <div id="resources">
+        <script src="jquery-3.3.1.min.js"></script>
+        <script>
+            var urlBase = window.location.origin;
+            window.onload = start();
+            var servers;
+            function start(){
+                var request = new XMLHttpRequest();
+                request.open('GET', '/data?q=getcolor');
+                request.setRequestHeader('Content-Type', 'text/plain');
+                request.onreadystatechange = function() {
+                    if(request.readyState == 4 && request.responseText == 'success') {
+                        console.log(request.getResponseHeader('themeHue'));
+                        updateColors(request.getResponseHeader('themeHue'));
+                    }
+                };
+                request.send();
+                LoadLobby();
+            }
+            function LoadLobby(){
+                var request = new XMLHttpRequest();
+                request.open('GET', '/data?q=servers');
+                request.setRequestHeader('Content-Type', 'text/plain');
+                request.onreadystatechange = function() {
+                    if(request.readyState == 4){ //request.responseText
+                        servers = JSON.parse(request.responseText);
+                        if(Object.keys(servers).length == 0)
+                            $('#serverWrapper').html($('#noServerResultTemplate').html());
+                        else{
+                            $('#serverWrapper').html('');
+                            var arr1 = [];
+                            var arr2 = [];
+                            for(var i in servers){
+                                if(servers[i].open) arr2.push(servers[i]);
+                                else arr1.push(servers[i]);
+                            }
+                            var arr = arr1.concat(arr2);
+                            for(var i in arr){
+                                var server = $('#serverResultTemplate').html();
+                                var sID = decodeURIComponent(arr[i].name);
+                                if(!servers[arr[i].name].open) server = server.replace('Join game', 'Spectate game');
+                                server = server.replace('Server Title Goes Here', sID);
+                                server = server.replace('dataidhere', sID);
+                                server = server.replace('booleanhere', arr[i].password);
+                                $('#serverWrapper').append(server);
+                            }
+                        }
+                    }
+                };
+                request.send(null);
+            }
+            function CreateLobby(){
+                var servername = $('#lobbyName').val();
+                var password = $('#lobbyPassword').val();
+                if(servername !== ''){
+                    var request = new XMLHttpRequest();
+                    request.open('POST', '/data?q=createserver');
+                    request.setRequestHeader('Content-Type', 'text/plain');
+                    request.setRequestHeader('password', password);
+                    request.onreadystatechange = function() {
+                        if(request.readyState == 4 && request.responseText == 'success'){ //request.responseText
+                            window.location.href = urlBase + '/lobby?l=' + encodeURIComponent(servername);
+                        }
+                        else if(request.readyState == 4 && request.responseText == 'failure'){
+				            window.alert('invalid name');
+                        }
+                    };
+                    request.send(servername);
+                } else window.alert('please input a server name');
+            }
+            function JoinLobby(){
+                var servername = serverName;
+                var password = $('#enterPassword').val();
+                var request = new XMLHttpRequest();
+                request.open('POST', '/data?q=joinserver');
+                request.setRequestHeader('Content-Type', 'text/plain');
+                request.setRequestHeader('password', password);
+                request.onreadystatechange = function() {
+                    if(request.readyState == 4 && request.responseText == 'success'){ //request.responseText
+                        window.location.href = urlBase + '/lobby?l=' + servername;
+                    }
+                    else if(request.readyState == 4 && request.responseText == 'failure'){
+                        window.alert('that server is full');
+                    }
+                };
+                request.send(servername);
+            }
+            function Logout(){
+                var request = new XMLHttpRequest();
+                request.open('POST', '/data?q=logout');
+                request.setRequestHeader('Content-Type', 'text/plain');
+                request.onreadystatechange = function() {
+                    if(request.readyState == 4 && request.responseText == 'success'){ //request.responseText
+                        document.cookie = 'userID=true';
+                        location.reload();
+                    }
+                };
+                request.send();
+            }
+            function openSettings()
+            {
+                $('#settingsPopup').css("visibility", "visible");
+                $('#fade').css("visibility", "visible");
+            }
+            function CreateLobbyPopup()
+            {
+                $('#lobbyPopup').css("visibility", "visible");
+                $('#fade').css("visibility", "visible");
+            }
+            function PopupDisappear()
+            {
+                $('#lobbyPopup').css("visibility", "hidden");
+                $('#passwordPopup').css("visibility", "hidden");
+                $('#settingsPopup').css("visibility", "hidden");
+                $('#fade').css("visibility", "hidden");
+                $('#lobbyPassword').val('');
+                $('#lobbyName').val('');
+                $('#passwordLabel').val('');
+            }
+            var serverName;
+            function CreatePasswordPopup(element)
+            {
+                serverName = element.getAttribute('dataid');
+                if(element.getAttribute('pass') == 'true'){
+                    $('#passwordPopup').css("visibility", "visible");
+                    $('#fade').css("visibility", "visible");
+                }
+                else{
+                    JoinLobby();
+                }
+            }
+            function displayColor(){
+                var hue = $('#hueInput').val();
+                $('#hueDisplay').css('background-color', `hsl(${hue}, 100%, 70%)`);
+            }
+            function changeColor(){
+                var hue = $('#hueInput').val();
+                var request = new XMLHttpRequest();
+                request.open('POST', '/data?q=setcolor');
+                request.setRequestHeader('Content-Type', 'text/plain');
+                request.onreadystatechange = function() {
+                    if(request.readyState == 4) window.alert(request.responseText);
+                    if(request.readyState == 4 && request.responseText == 'success') updateColors(hue);
+                };
+                request.send(hue);
+            }
+            function updateColors(hue){
+                $('body').css('background-color',`hsl(${hue}, 100%, 70%)`);
+                $('.popupPanel button').css('background-color',`hsl(${hue}, 100%, 70%)`);
+                $('.resultcontent button').css('background-color',`hsl(${hue}, 100%, 70%)`);
+                $('.resultContent h3').css('background-color',`hsl(${hue}, 100%, 70%)`);
+                $('#createLobby').css('color',`hsl(${hue}, 100%, 70%)`);
+                $('#refreshBrowser').css('color',`hsl(${hue}, 100%, 70%)`);
+            }
+        </script>
+        <style>
+            body {margin: 0px; width: 100vw; height: 100vh; max-width: 100%; max-height: 100%; background-color: hsl(210,100%,70%);}
+            #createServerMenu{width: 600px; display: block; overflow: auto; margin-bottom: 5px;}
+            .lobbyBrowser {width: 600px; height: 35px;}
+            .lobbyBrowser p{float: left; margin: 5px; display: block; color: white; margin: 0px; padding: 5px; text-align: left; font-family: monospace; font-size: xx-large;}
+            #serverWrapper {width: 580px; background-color: white; border-radius: 3px; padding: 10px; padding-top: 5px; padding-bottom: 5px; overflow: auto;}
+            #serverPanel {position: absolute; left: 50%; margin-right: -50%; transform: translateX(-50%);}
+            .popupPanel {width: 100%; height: 100%; padding-top: 5px;}
+            .popupPanel p{float:left; margin: 0px; margin-right: 10px; font-family: monospace; font-size: x-large; margin-bottom: 5px;}
+            .popupPanel input{box-sizing: border-box; display: block; height: 40px; font-size: 20px; border: 1px gray solid; border-radius: 3px; padding: 10px; width: calc(100% - 10px); margin: 5px;}
+            .popupPanel button{display: block; background-color: hsl(210,100%,70%); width: calc(100% - 10px); height: 40px; font-family: monospace; font-size: x-large; border: 0px solid; border-radius: 3px; margin: 5px; margin-top: 10px;}
+            .resultContent {width: calc(100% - 10px); margin: 0px; margin-bottom: 5px; margin-top: 5px; background-color: white; padding: 5px; overflow: auto; border: 2px hsl(210,100%,70%) solid; border-radius: 3px;}
+            .resultContent h3{float: left; font-family: monospace; font-size: x-large; margin: 13px;}
+            .resultContent button{float: right; display: block; background-color: hsl(210,100%,70%); width: 200px; height: 40px; font-family: monospace; font-size: x-large; border: 0px solid; border-radius: 3px; margin: 5px;}
+            #header {background-color: #222; text-align: center; height: 80px; padding: 10px; margin-bottom: 50px;}
+            #header h1 {margin-left: 15px;}
+            #titleText {margin: 0px; color: white; font-family: monospace; font-weight: 30; line-height: 60px; position: absolute; left: 50%; margin-right: -50%; transform: translateX(-50%);}
+            .button {float: right; height: 34px; width: 34px; padding: 0px;}
+            #createLobby {float: right; background-color: white; color: hsl(210,100%,70%); width: 180px; height: 40px; border: 0px; border-radius: 3px; font-family: monospace; font-size: x-large; margin-bottom: 10px;}
+            #refreshBrowser {float: right; background-color: white; color: hsl(210,100%,70%); width: 180px; height: 40px; border: 0px; border-radius: 3px; font-family: monospace; font-size: x-large; margin-bottom: 10px; margin-right: 20px;}
+            #noResults {width: 100%; float: left; margin-bottom: 5px; margin-top: 5px; background-color: #eee; overflow: auto;}
+            #noResults p{text-align: center; margin: 5px; font-family: monospace; font-size: x-large;}
+            .largeText {font-size: xx-large; font-family: monospace; display: block; text-align: center;}
+
+            #lobbyPopup {position: fixed; width: 500px; height: 250px; top: 50%; left: 50%; margin-right: -50%; transform: translate(-50%,-50%);
+                        background-color: white; border: black 2px solid; border-radius: 3px;}
+            #passwordPopup {position: fixed; width: 500px; height: 150px; top: 50%; left: 50%; margin-right: -50%; transform: translate(-50%,-50%);
+                        background-color: white; border: black 2px solid; border-radius: 3px;}
+            #settingsPopup {position: fixed; width: 500px; height: 200px; top: 50%; left: 50%; margin-right: -50%; transform: translate(-50%,-50%);
+                        background-color: white; border: black 2px solid; border-radius: 3px;}
+            #fade {position: fixed; top: 50%; left: 50%; margin-right: -50%; transform: translate(-50%,-50%); width: 100vw; height: 100vh; background-color: black; opacity: 0.8; visibility: hidden;}
+        </style>
+
+        <header id="header">
+            <h1 id="titleText">
+                testapp325
+            </h1>
+            <div style="float: right; width: 33px;">
+                <button class="button" style="margin-bottom: 12px;">
+                    <img src="assets/icons/settingsIcon.png" alt="settings" onclick="openSettings()">
+                </button>
+                <button class="button"">
+                    <img src="assets/icons/logoutIcon.png" alt="logout" onclick="Logout()">
+                </button>
+            </div>
+        </header>
+        <template id="serverResultTemplate">
+            <div class="resultContent">
+                <h3>
+                    Server Title Goes Here
+                </h3>
+                <button onclick="CreatePasswordPopup(this)" dataid="dataidhere" pass='booleanhere'>Join game</button>
+            </div>
+        </template>
+        <template id="noServerResultTemplate">
+            <div id="noResults">
+                <p>
+                    No Lobbies Found
+                </p>
+            </div>
+        </template>
+        <div id="serverPanel">
+            <div id="createServerMenu">
+                <div class="lobbyBrowser">
+                    <p>Lobby Browser</p>
+                    <button id="createLobby" onclick="CreateLobbyPopup()">
+                        Create Lobby
+                    </button>
+                    <button id="refreshBrowser" onclick="LoadLobby()">
+                        Refresh Browser
+                    </button>
+                </div>
+                <div id="serverWrapper">
+                    <p>
+                        loading...
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div id="fade"; onclick="PopupDisappear()">
+
+        </div>
+    <div id="lobbyPopup" style="visibility: hidden;">
+        <div class="popupPanel">
+            <label type="text" id="lobbyLabel" class="largeText">
+                Create Lobby
+            </label>
+            <div style="border: 1px gray solid; margin: 5px;"></div>
+            <p style="margin-left: 5px;">Lobby Name</p>
+            <input type="text" id="lobbyName">
+            <p style="margin-left: 5px;">Lobby Password (Optional)</p>
+            <input type="text" id="lobbyPassword">
+            <button onclick="CreateLobby()">
+                Create New Lobby
+            </button>
+        </div>  
+    </div>
+    <div id="passwordPopup" style="visibility: hidden;">
+        <div class="popupPanel">
+            <label type="text" id="passwordLabel" class="largeText">
+                Password Required
+            </label>
+            <input type="text" id="enterPassword">
+            <button onclick="JoinLobby()">
+                Join Lobby
+            </button>
+        </div>  
+    </div>
+    <div id="settingsPopup" style="visibility: hidden;">
+        <div class="popupPanel">
+            <label type="text" id="settingsLabel" class="largeText">
+                Settings
+            </label>
+            <input oninput="displayColor()" onchange="displayColor()" id="hueInput" type="range" minlength="3" maxlength="3" min="1" max="360" value="210" style="padding-left: 0px; padding-right: 0px;">
+            <div id="hueDisplay" style="width: 400px; height: 20px; border: 2px black solid; margin:auto; background-color: hsl(210, 100%, 70%)">
+                <button onclick="changeColor()" style="margin-top:35px;">
+                    Confirm Color
+                </button>
+            </div>
+        </div>  
+    </div>
+    
+</body>
+</html>
